@@ -241,8 +241,7 @@ const UsersTable = () => {
       id: "actions",
       header: "Action",
       enableHiding: false,
-      cell: ({ row }) => {
-        // const user = row.original;
+      cell: () => {
         return (
           <div className="flex space-x-1.5 items-center">
             <Badge>
