@@ -1,13 +1,30 @@
 import type { IUserResponse } from "@/types/user-type";
 import request from "./request";
+import { create } from "zustand";
+
+interface UserEditDialogState {
+  isOpen: boolean;
+  userData: any;
+  open: (user: any) => void;
+  close: () => void;
+}
+
+export const useUserEditDialog = create<UserEditDialogState>((set) => ({
+  isOpen: false,
+  userData: null,
+  open: (user) => set({ isOpen: true, userData: user }),
+  close: () => set({ isOpen: false, userData: null }),
+  
+}));
 
 type UserQueryParams = {
   page: number;
   pageSize: number;
   sortBy: string;
   sortOrder: string;
-  email: object;
+  email: string; // fix this from object to string
 };
+
 
 export const requestUser = () => {
   const USERS = async ({
@@ -34,8 +51,17 @@ export const requestUser = () => {
     });
   };
 
+  const DELETE_USER = async (id: string) => {
+    return await request({
+      url: `/user/delete-user/${id}`,
+      method: "DELETE",
+    });
+  };
+  
+
   return {
     USERS,
     UPDATE_USER,
+    DELETE_USER, // return this
   };
 };

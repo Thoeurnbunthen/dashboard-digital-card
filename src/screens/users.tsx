@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { requestUser } from "@/lib/api/user-api";
 import {
   type ColumnDef,
@@ -26,10 +26,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronDown, Pen, Trash } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { IUser } from "@/types/user-type";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useQuery } from "@tanstack/react-query";
 import { Pagination } from "@/lib/pagination";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -43,31 +42,32 @@ dayjs.extend(timezone);
 
 const UsersTable = () => {
   const queryClient = useQueryClient();
-  const { UPDATE_USER } = requestUser();
+  const { USERS, UPDATE_USER, DELETE_USER } = requestUser();
+
   const { mutate: updateUserStatus, isPending: isUpdating } = useMutation({
     mutationFn: ({ id, status }: { id: string; status: boolean }) =>
       UPDATE_USER(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
-  const { USERS } = requestUser();
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
+
+  const { mutate: deleteUser } = useMutation({
+    mutationFn: (id: string) => DELETE_USER(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
   const [pagination, setPagination] = useState({
-    pageIndex: 0, //initial page index
-    pageSize: 10, //default page size
+    pageIndex: 0,
+    pageSize: 10,
   });
 
   const sortField = sorting[0]?.id ?? "created_at";
   const sortOrder =
     sorting.length === 0
-      ? "DESC" // default sort order
+      ? "DESC"
       : sorting[0]?.desc
       ? "DESC"
       : "ASC";
@@ -87,10 +87,9 @@ const UsersTable = () => {
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
         sortBy: sortField,
-        sortOrder: sortOrder, // Use actual sort order instead of hardcoded "DESC"
-        email: emailFilter,
+        sortOrder,
+        email: typeof emailFilter === "string" ? emailFilter : "",
       }),
-    // keepPreviousData: true, // This helps with smooth pagination transitions
   });
 
   const columns: ColumnDef<IUser>[] = [
@@ -148,57 +147,51 @@ const UsersTable = () => {
     },
     {
       accessorKey: "full_name",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              column.toggleSorting(column.getIsSorted() === "desc")
-            }
-          >
-            Fullname
-            <ArrowUpDown />
-          </Button>
-        );
-      },
-      cell: ({ row }) => {
-        return <div className="capitalize">{row.getValue("full_name")}</div>;
-      },
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() =>
+            column.toggleSorting(column.getIsSorted() === "desc")
+          }
+        >
+          Fullname
+          <ArrowUpDown />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("full_name")}</div>
+      ),
     },
     {
       accessorKey: "user_name",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              column.toggleSorting(column.getIsSorted() === "desc")
-            }
-          >
-            Username
-            <ArrowUpDown />
-          </Button>
-        );
-      },
-      cell: ({ row }) => {
-        return <div className="capitalize">{row.getValue("user_name")}</div>;
-      },
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() =>
+            column.toggleSorting(column.getIsSorted() === "desc")
+          }
+        >
+          Username
+          <ArrowUpDown />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("user_name")}</div>
+      ),
     },
     {
       accessorKey: "email",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              column.toggleSorting(column.getIsSorted() === "desc")
-            }
-          >
-            Email
-            <ArrowUpDown />
-          </Button>
-        );
-      },
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() =>
+            column.toggleSorting(column.getIsSorted() === "desc")
+          }
+        >
+          Email
+          <ArrowUpDown />
+        </Button>
+      ),
       cell: ({ row }) => (
         <div className="lowercase">{row.getValue("email")}</div>
       ),
@@ -209,9 +202,6 @@ const UsersTable = () => {
       cell: ({ row }) => {
         const user = row.original;
         const isActive = user.is_active;
-        // const payload = user.is_active == true ? false : true;
-        // console.log(payload);
-
         return (
           <Badge
             variant={isActive ? "default" : "destructive"}
@@ -227,13 +217,12 @@ const UsersTable = () => {
     },
     {
       accessorKey: "created_at",
-      header: () => <>Crated At</>,
+      header: () => <>Created At</>,
       cell: ({ row }) => {
         const rawDate = row.getValue("created_at") as string;
         const fixedTime = dayjs(rawDate)
           .add(7, "hour")
           .format("YYYY-MM-DD hh:mm A");
-
         return <div className="text-sm text-muted-foreground">{fixedTime}</div>;
       },
     },
@@ -241,36 +230,26 @@ const UsersTable = () => {
       id: "actions",
       header: "Action",
       enableHiding: false,
-      cell: () => {
+      cell: ({ row }) => {
+        const user = row.original;
         return (
           <div className="flex space-x-1.5 items-center">
             <Badge>
               <Pen />
               Edit
             </Badge>
-            <Badge variant="destructive">
+            <Badge
+              variant="destructive"
+              className="cursor-pointer"
+              onClick={() => {
+                if (confirm("Are you sure you want to delete this user?")) {
+                  deleteUser(user.id);
+                }
+              }}
+            >
               <Trash /> Delete
             </Badge>
           </div>
-          //   <DropdownMenu>
-          //     <DropdownMenuTrigger asChild>
-          //       <Button variant="ghost" className="h-8 w-8 p-0">
-          //         <span className="sr-only">Open menu</span>
-          //         <MoreHorizontal />
-          //       </Button>
-          //     </DropdownMenuTrigger>
-          //     <DropdownMenuContent align="end">
-          //       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          //       <DropdownMenuItem
-          //         onClick={() => navigator.clipboard.writeText(user.id)}
-          //       >
-          //         Copy user ID
-          //       </DropdownMenuItem>
-          //       <DropdownMenuSeparator />
-          //       <DropdownMenuItem>View user details</DropdownMenuItem>
-          //       <DropdownMenuItem>Edit user</DropdownMenuItem>
-          //     </DropdownMenuContent>
-          //   </DropdownMenu>
         );
       },
     },
@@ -283,15 +262,11 @@ const UsersTable = () => {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    // Remove these for server-side pagination
-    // getPaginationRowModel: getPaginationRowModel(),
-    // getSortedRowModel: getSortedRowModel(),
-    // getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination, // Enable pagination change handler
-    manualPagination: true, // Enable manual pagination for server-side
-    manualSorting: true, // Enable manual sorting for server-side
+    onPaginationChange: setPagination,
+    manualPagination: true,
+    manualSorting: true,
     state: {
       sorting,
       columnFilters,
@@ -303,16 +278,14 @@ const UsersTable = () => {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      {/* //alert dailong to update status */}
       <UserStatusAlertDialog
         onConfirm={(userId, newStatus) => {
           updateUserStatus({ id: userId, status: newStatus });
         }}
         isLoading={isUpdating}
       />
-      ;
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
       </div>
       <div className="space-y-4">
         <div className="w-full">
@@ -337,20 +310,18 @@ const UsersTable = () => {
                 {table
                   .getAllColumns()
                   .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -359,18 +330,16 @@ const UsersTable = () => {
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      );
-                    })}
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 ))}
               </TableHeader>
@@ -418,7 +387,6 @@ const UsersTable = () => {
               {table.getFilteredSelectedRowModel().rows.length} of{" "}
               {data?.meta?.total || 0} row(s) selected.
             </div>
-
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <p className="text-sm font-medium">Rows per page</p>
@@ -436,14 +404,11 @@ const UsersTable = () => {
                   ))}
                 </select>
               </div>
-
-              {/* Simple Flow Pagination */}
               <Pagination
                 currentPage={table.getState().pagination.pageIndex + 1}
                 totalPages={table.getPageCount()}
                 onPageChange={(page) => table.setPageIndex(page - 1)}
               />
-
               <div className="text-sm text-muted-foreground">
                 Page {data?.meta?.page || 1} of {table.getPageCount()}
               </div>
