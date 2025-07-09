@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserNav() {
+  const handleLogout = () => {
+    localStorage.removeItem("token"); // ✅ Remove the token
+    window.location.href = "/login"; // ✅ Redirect to login
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -29,6 +34,7 @@ export function UserNav() {
           </div>
         </div>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
@@ -38,17 +44,22 @@ export function UserNav() {
             </p>
           </div>
         </DropdownMenuLabel>
+
         <DropdownMenuSeparator />
+
         <DropdownMenuItem>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
+
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
+
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
