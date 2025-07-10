@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import ProtectedRoute from "./components/protect-route";
 import Users from "./screens/users";
 import Card from "./screens/cards"
+import Profile from "./screens/profile";
 
 function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
@@ -29,6 +30,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/users" element={<Users />} />
             <Route path="/cards" element={<Card />} />
+             <Route path="/profile" element={<Profile />} />
           </Route>
         </Route>
       </Routes>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useNavigate } from "react-router-dom"; // 
 import { LogOut, Settings, User } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,9 +14,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserNav() {
+  const navigate = useNavigate(); // ✅ this replaces useRouter
+
   const handleLogout = () => {
-    localStorage.removeItem("token"); // ✅ Remove the token
-    window.location.href = "/login"; // ✅ Redirect to login
+    localStorage.removeItem("token");
+    navigate("/login"); // ✅ navigate in React
+  };
+
+  const goToProfile = () => {
+    navigate("/profile"); // ✅ navigate to profile
   };
 
   return (
@@ -47,7 +54,7 @@ export function UserNav() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={goToProfile}>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
