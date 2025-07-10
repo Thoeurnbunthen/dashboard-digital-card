@@ -8,6 +8,7 @@ import {
   Users2Icon,
 } from "lucide-react";
 import { useLocation } from "react-router";
+import { Link } from "react-router-dom"; // ✅ for client-side navigation
 
 import {
   Sidebar,
@@ -21,15 +22,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { UserNav } from "../user-nav";
-// import { UserNav } from "@/components/user-nav"
+import { UserNav } from "../user-nav"; // ✅ Only one correct import
 
 const menuItems = [
   {
     title: "Dashboard",
     url: "/",
     icon: Home,
-    isActive: true,
   },
   {
     title: "Users",
@@ -46,13 +45,14 @@ const menuItems = [
 const secondaryItems = [
   {
     title: "Settings",
-    url: "#",
+    url: "/settings",
     icon: Settings,
   },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-6 py-4">
@@ -61,6 +61,7 @@ export function AppSidebar() {
           <span className="text-lg font-semibold">Acme Corp</span>
         </div>
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
@@ -72,26 +73,30 @@ export function AppSidebar() {
                     asChild
                     isActive={location.pathname === item.url}
                   >
-                    <a href={item.url}>
+                    <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
               {secondaryItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === item.url}
+                  >
+                    <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -99,6 +104,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="border-t p-4">
         <UserNav />
       </SidebarFooter>

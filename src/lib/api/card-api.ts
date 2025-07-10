@@ -1,4 +1,4 @@
-import type { ICardResponse } from "@/types/card-types";
+import type { ICardResponse } from "@/types/card-type";
 import request from "./request";
 
 export type CardQueryParams = {
@@ -50,7 +50,7 @@ export const requestCard = () => {
       data: { is_active: status },
     });
   };
-
+ 
   const DELETE_CARD = async (id: string) => {
     return await request({
       url: `/api/v1/card/delete-card-by-admin/${id}`,
