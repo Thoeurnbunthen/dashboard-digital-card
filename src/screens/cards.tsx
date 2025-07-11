@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { requestCard } from "@/lib/api/card-api";
 import {
   type ColumnDef,
@@ -28,6 +30,17 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronDown, Eye, Pen, Trash } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
+
+// ShadCN Dialog components:
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 // Types
 type ISocialLink = {
@@ -77,41 +90,17 @@ const Pagination: React.FC<PaginationProps> = ({
     const pages: (number | string)[] = [];
 
     if (totalPages <= 7) {
-      // Show all pages if 7 or fewer
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
-      // Show first 3 pages
-      pages.push(1);
-      pages.push(2);
-      pages.push(3);
-
-      if (currentPage > 5) {
-        pages.push("...");
-      }
-
-      // Current page neighbors
+      pages.push(1, 2, 3);
+      if (currentPage > 5) pages.push("...");
       const start = Math.max(4, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        if (!pages.includes(i)) {
-          pages.push(i);
-        }
-      }
-
-      if (currentPage < totalPages - 3) {
-        pages.push("...");
-      }
-
-      // Last page
-      if (!pages.includes(totalPages)) {
-        pages.push(totalPages);
-      }
+      for (let i = start; i <= end; i++) if (!pages.includes(i)) pages.push(i);
+      if (currentPage < totalPages - 3) pages.push("...");
+      if (!pages.includes(totalPages)) pages.push(totalPages);
     }
 
-    // Remove duplicates & sort
     return pages
       .filter((v, i, a) => a.indexOf(v) === i)
       .sort((a, b) => {
@@ -166,6 +155,7 @@ const Pagination: React.FC<PaginationProps> = ({
 
 const CardsTable: React.FC = () => {
   const { GET_CARDS } = requestCard();
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -180,7 +170,7 @@ const CardsTable: React.FC = () => {
   const nameFilter = (columnFilters.find((f) => f.id === "full_name")?.value ??
     "") as string;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: [
       "cards",
       pagination.pageIndex,
@@ -199,6 +189,105 @@ const CardsTable: React.FC = () => {
         title: nameFilter || undefined,
       }),
   });
+
+  // Modal state
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [editingCard, setEditingCard] = useState<ICard | null>(null);
+
+  // Form fields state
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    gender: "",
+    dob: "",
+    address: "",
+    phone: "",
+    nationality: "",
+    card_type: "",
+  });
+
+  // When editingCard changes, populate form
+  useEffect(() => {
+    if (editingCard) {
+      setForm({
+        full_name: editingCard.user.full_name,
+        email: editingCard.user.email,
+        gender: editingCard.gender,
+        dob: editingCard.dob ? dayjs(editingCard.dob).format("YYYY-MM-DD") : "",
+        address: editingCard.address,
+        phone: editingCard.phone,
+        nationality: editingCard.nationality,
+        card_type: editingCard.card_type,
+      });
+    }
+  }, [editingCard]);
+
+  // Handle input change
+  const onInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Submit update API
+  const handleUpdate = async () => {
+    if (!editingCard) return;
+    try {
+      const res = await fetch(
+        `http://localhost:3000/api/v1/card/update-card/${editingCard.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            full_name: form.full_name,
+            email: form.email,
+            gender: form.gender,
+            dob: form.dob,
+            address: form.address,
+            phone: form.phone,
+            nationality: form.nationality,
+            card_type: form.card_type,
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Update failed");
+
+      alert("Updated successfully");
+      setOpenEditDialog(false);
+      setEditingCard(null);
+      refetch();
+    } catch (err) {
+      console.error("Update error", err);
+      alert("Update failed");
+    }
+  };
+
+  // Handle delete API
+  const handleDelete = async (cardId: string) => {
+    try {
+      const res = await fetch(
+        `http://localhost:3000/api/v1/card/delete-card/${cardId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Delete failed");
+
+      alert("Card deleted successfully");
+      refetch(); // Refresh the table data
+    } catch (err) {
+      console.error("Delete error", err);
+      alert("Failed to delete card");
+    }
+  };
 
   const columns: ColumnDef<ICard>[] = [
     {
@@ -273,7 +362,7 @@ const CardsTable: React.FC = () => {
                 <ChevronDown className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuContent align="end" className="w-64">
               <Button
                 variant="ghost"
                 className="w-full justify-start"
@@ -284,14 +373,21 @@ const CardsTable: React.FC = () => {
               <Button
                 variant="ghost"
                 className="w-full justify-start text-yellow-600"
-                onClick={() => console.log("Edit", card)}
+                onClick={() => {
+                  setEditingCard(card);
+                  setOpenEditDialog(true);
+                }}
               >
                 <Pen className="w-4 h-4 mr-2" /> Edit
               </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start text-red-600"
-                onClick={() => console.log("Delete", card.id)}
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this card?")) {
+                    handleDelete(card.id);
+                  }
+                }}
               >
                 <Trash className="w-4 h-4 mr-2" /> Delete
               </Button>
@@ -325,12 +421,10 @@ const CardsTable: React.FC = () => {
 
   return (
     <div className="flex-1 space-y-6 p-6 md:p-8">
-      {/* Header with Title */}
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Cards Dashboard</h2>
       </div>
 
-      {/* Filters & Column Toggle */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4">
         <Input
           placeholder="Filter by name..."
@@ -342,32 +436,8 @@ const CardsTable: React.FC = () => {
           }
           className="max-w-sm"
         />
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((col) => col.getCanHide())
-              .map((col) => (
-                <DropdownMenuCheckboxItem
-                  key={col.id}
-                  checked={col.getIsVisible()}
-                  onCheckedChange={(val) => col.toggleVisibility(!!val)}
-                  className="capitalize"
-                >
-                  {col.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      {/* Table */}
       <div className="rounded-md border bg-white shadow-sm">
         <Table>
           <TableHeader>
@@ -423,40 +493,132 @@ const CardsTable: React.FC = () => {
         </Table>
       </div>
 
-      {/* Footer - Pagination and Rows per Page */}
+      {/* Pagination */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
         <div className="text-muted-foreground text-sm">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {data?.meta?.total || 0} row(s) selected.
         </div>
-
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
-            <select
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => table.setPageSize(Number(e.target.value))}
-              className="h-8 w-[70px] rounded border border-input bg-background px-3 py-1 text-sm"
-            >
-              {[5, 10, 20, 30, 40, 50].map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <Pagination
-            currentPage={table.getState().pagination.pageIndex + 1}
-            totalPages={table.getPageCount()}
-            onPageChange={(page) => table.setPageIndex(page - 1)}
-          />
-
-          <div className="text-sm text-muted-foreground">
-            Page {data?.meta?.page || 1} of {table.getPageCount()}
-          </div>
-        </div>
+        <Pagination
+          currentPage={table.getState().pagination.pageIndex + 1}
+          totalPages={table.getPageCount()}
+          onPageChange={(page) => table.setPageIndex(page - 1)}
+        />
       </div>
+
+      {/* EDIT MODAL */}
+      <Dialog open={openEditDialog} onOpenChange={setOpenEditDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Card</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Full Name */}
+            <div>
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                value={form.full_name}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Gender */}
+            <div>
+              <Label htmlFor="gender">Gender</Label>
+              <select
+                id="gender"
+                name="gender"
+                value={form.gender}
+                onChange={onInputChange}
+                className="w-full rounded border border-input bg-background px-3 py-2"
+              >
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            {/* DOB */}
+            <div>
+              <Label htmlFor="dob">Date of Birth</Label>
+              <Input
+                id="dob"
+                name="dob"
+                type="date"
+                value={form.dob}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Address */}
+            <div>
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                name="address"
+                value={form.address}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Phone */}
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={form.phone}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Nationality */}
+            <div>
+              <Label htmlFor="nationality">Nationality</Label>
+              <Input
+                id="nationality"
+                name="nationality"
+                value={form.nationality}
+                onChange={onInputChange}
+              />
+            </div>
+
+            {/* Card Type */}
+            <div>
+              <Label htmlFor="card_type">Card Type</Label>
+              <Input
+                id="card_type"
+                name="card_type"
+                value={form.card_type}
+                onChange={onInputChange}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
