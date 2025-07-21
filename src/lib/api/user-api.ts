@@ -22,7 +22,7 @@ type UserQueryParams = {
   pageSize: number;
   sortBy: string;
   sortOrder: string;
-  email: string; // fix this from object to string
+  email: string; 
 };
 
 
@@ -57,11 +57,11 @@ export const requestUser = () => {
       method: "DELETE",
     });
   };
-  
 
   return {
     USERS,
     UPDATE_USER,
-    DELETE_USER, // return this
+    DELETE_USER, 
   };
+
 };
