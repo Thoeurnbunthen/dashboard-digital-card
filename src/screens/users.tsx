@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { requestUser } from "@/lib/api/user-api";
 import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import {
   type ColumnDef,
   type ColumnFiltersState,
   flexRender,
@@ -238,17 +248,33 @@ const UsersTable = () => {
               <Pen />
               Edit
             </Badge>
-            <Badge
-              variant="destructive"
-              className="cursor-pointer"
-              onClick={() => {
-                if (confirm("Are you sure you want to delete this user?")) {
-                  deleteUser(user.id);
-                }
-              }}
-            >
-              <Trash /> Delete
-            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Badge variant="destructive" className="cursor-pointer">
+                  <Trash size={16} />
+                  Delete
+                </Badge>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete{" "}
+                    <span className="font-semibold">{user.full_name}</span>?
+                  </AlertDialogTitle>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteUser(user.id)}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       },
