@@ -1,4 +1,4 @@
-import type { IUserResponse } from "@/types/user-type";
+import type { IUserResponse, IUser } from "@/types/user-type";
 import request from "./request";
 import { create } from "zustand";
 
@@ -41,13 +41,11 @@ export const requestUser = () => {
     });
   };
 
-  const UPDATE_USER = async (id: string, status: boolean) => {
+  const UPDATE_USER = async (id: string, payload: Partial<IUser>) => {
     return await request({
       url: `/user/update-user/${id}`,
       method: "PUT",
-      data: {
-        is_active: status,
-      },
+      data: payload,
     });
   };
 
