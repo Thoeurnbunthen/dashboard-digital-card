@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { requestUser } from "@/lib/api/user-api";
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -36,8 +27,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ChevronDown, Pen, Trash } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { IUser } from "@/types/user-type";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pagination } from "@/lib/pagination";
 import dayjs from "dayjs";
@@ -45,8 +34,20 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { Badge } from "@/components/ui/badge";
 import { useUserStatusDialog } from "@/store/user-status-dialog-store";
+import { useUserEditDialog } from "@/store/user-edit-dialog-store";
 import UserStatusAlertDialog from "@/components/user-status-dialong";
-
+import EditUserDialog from "@/components/ui/edit-user-dialog";
+import type { IUser } from "@/types/user-type";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -54,17 +55,30 @@ const UsersTable = () => {
   const queryClient = useQueryClient();
   const { USERS, UPDATE_USER, DELETE_USER } = requestUser();
 
-  const { mutate: updateUserStatus, isPending: isUpdating } = useMutation({
+  // Mutation for updating user status (active/block)
+  const { mutate: updateUserStatus, isPending: isUpdatingStatus } = useMutation({
     mutationFn: ({ id, status }: { id: string; status: boolean }) =>
-      UPDATE_USER(id, status),
+      UPDATE_USER(id, { is_active: status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  // Mutation for deleting user
   const { mutate: deleteUser } = useMutation({
     mutationFn: (id: string) => DELETE_USER(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  // Mutation for updating user from edit dialog
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<IUser> }) =>
+      UPDATE_USER(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      useUserEditDialog.getState().close();
+    },
+  });
+
+  // React Query fetch for users list
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -76,11 +90,7 @@ const UsersTable = () => {
 
   const sortField = sorting[0]?.id ?? "created_at";
   const sortOrder =
-    sorting.length === 0
-      ? "DESC"
-      : sorting[0]?.desc
-      ? "DESC"
-      : "ASC";
+    sorting.length === 0 ? "DESC" : sorting[0]?.desc ? "DESC" : "ASC";
   const emailFilter = columnFilters.find((f) => f.id === "email")?.value ?? "";
 
   const { data, isLoading } = useQuery({
@@ -102,6 +112,7 @@ const UsersTable = () => {
       }),
   });
 
+  // Table columns definition
   const columns: ColumnDef<IUser>[] = [
     {
       id: "select",
@@ -131,8 +142,7 @@ const UsersTable = () => {
       cell: ({ row, table }) => {
         const pageIndex = table.getState().pagination.pageIndex;
         const pageSize = table.getState().pagination.pageSize;
-        const rowIndex = row.index;
-        return <div>{pageIndex * pageSize + rowIndex + 1}</div>;
+        return <div>{pageIndex * pageSize + row.index + 1}</div>;
       },
       enableSorting: false,
       enableHiding: false,
@@ -160,9 +170,7 @@ const UsersTable = () => {
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() =>
-            column.toggleSorting(column.getIsSorted() === "desc")
-          }
+          onClick={() => column.toggleSorting(column.getIsSorted() === "desc")}
         >
           Fullname
           <ArrowUpDown />
@@ -177,9 +185,7 @@ const UsersTable = () => {
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() =>
-            column.toggleSorting(column.getIsSorted() === "desc")
-          }
+          onClick={() => column.toggleSorting(column.getIsSorted() === "desc")}
         >
           Username
           <ArrowUpDown />
@@ -194,17 +200,13 @@ const UsersTable = () => {
       header: ({ column }) => (
         <Button
           variant="ghost"
-          onClick={() =>
-            column.toggleSorting(column.getIsSorted() === "desc")
-          }
+          onClick={() => column.toggleSorting(column.getIsSorted() === "desc")}
         >
           Email
           <ArrowUpDown />
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="lowercase">{row.getValue("email")}</div>
-      ),
+      cell: ({ row }) => <div className="lowercase">{row.getValue("email")}</div>,
     },
     {
       accessorKey: "is_active",
@@ -244,9 +246,11 @@ const UsersTable = () => {
         const user = row.original;
         return (
           <div className="flex space-x-1.5 items-center">
-            <Badge>
-              <Pen />
-              Edit
+            <Badge
+              className="cursor-pointer"
+              onClick={() => useUserEditDialog.getState().open(user)}
+            >
+              <Pen size={14} /> Edit
             </Badge>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -281,10 +285,11 @@ const UsersTable = () => {
     },
   ];
 
+  // Initialize table instance
   const table = useReactTable({
     data: data?.data || [],
     columns,
-    pageCount: data?.meta ? Math.ceil(data?.meta.total / data?.meta.limit) : -1,
+    pageCount: data?.meta ? Math.ceil(data.meta.total / data.meta.limit) : -1,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -304,12 +309,25 @@ const UsersTable = () => {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      {/* User Status Change Confirmation Dialog */}
       <UserStatusAlertDialog
         onConfirm={(userId, newStatus) => {
           updateUserStatus({ id: userId, status: newStatus });
         }}
-        isLoading={isUpdating}
+        isLoading={isUpdatingStatus}
       />
+
+      {/* Edit User Dialog */}
+      <EditUserDialog
+        onConfirm={(updatedUserData) => {
+          updateUserMutation.mutate({
+            id: updatedUserData.id,
+            data: updatedUserData,
+          });
+        }}
+        isLoading={updateUserMutation.isPending}
+      />
+
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
       </div>
@@ -318,9 +336,7 @@ const UsersTable = () => {
           <div className="flex items-center py-4">
             <Input
               placeholder="Filter emails..."
-              value={
-                (table.getColumn("email")?.getFilterValue() as string) ?? ""
-              }
+              value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
               onChange={(event) =>
                 table.getColumn("email")?.setFilterValue(event.target.value)
               }
@@ -351,6 +367,7 @@ const UsersTable = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -369,38 +386,30 @@ const UsersTable = () => {
                   </TableRow>
                 ))}
               </TableHeader>
+
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
                       Loading...
                     </TableCell>
                   </TableRow>
-                ) : table.getRowModel().rows?.length ? (
+                ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => (
                     <TableRow
                       key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
+                      data-state={row.getIsSelected() ? "selected" : undefined}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
                       No results.
                     </TableCell>
                   </TableRow>
@@ -408,11 +417,12 @@ const UsersTable = () => {
               </TableBody>
             </Table>
           </div>
+
           <div className="flex items-center justify-between py-4">
             <div className="text-muted-foreground text-sm">
-              {table.getFilteredSelectedRowModel().rows.length} of{" "}
-              {data?.meta?.total || 0} row(s) selected.
+              {table.getFilteredSelectedRowModel().rows.length} of {data?.meta?.total || 0} row(s) selected.
             </div>
+
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <p className="text-sm font-medium">Rows per page</p>
@@ -430,11 +440,13 @@ const UsersTable = () => {
                   ))}
                 </select>
               </div>
+
               <Pagination
                 currentPage={table.getState().pagination.pageIndex + 1}
                 totalPages={table.getPageCount()}
                 onPageChange={(page) => table.setPageIndex(page - 1)}
               />
+
               <div className="text-sm text-muted-foreground">
                 Page {data?.meta?.page || 1} of {table.getPageCount()}
               </div>
